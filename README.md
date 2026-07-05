@@ -1,10 +1,11 @@
 # 📋 TodoList Application
 
-Ứng dụng Todo full-stack với frontend React hiện đại và backend Express.js với MongoDB.
+Ứng dụng Todo full-stack với frontend React và backend Express.js với MongoDB.
 
 ## 🚀 Công Nghệ Sử Dụng
 
 ### Frontend
+
 - **React 19** - Thư viện UI
 - **TypeScript** - Kiểm tra kiểu dữ liệu
 - **Vite** - Build tool và dev server
@@ -14,6 +15,7 @@
 - **Axios** - HTTP client
 
 ### Backend
+
 - **Node.js** - Runtime environment
 - **Express.js** - Web framework
 - **MongoDB** - Database
@@ -121,11 +123,13 @@ TodoList/
 ## 🔧 Các Lệnh Có Sẵn
 
 ### Backend
+
 - `npm run dev` - Khởi động server với nodemon (development)
 - `npm start` - Khởi động server (production)
 - `npm test` - Chạy tests
 
 ### Frontend
+
 - `npm run dev` - Khởi động development server
 - `npm run build` - Build cho production
 - `npm run lint` - Chạy linter
@@ -143,15 +147,17 @@ Backend API cung cấp các endpoints sau:
 ## 🐛 Xử Lý Lỗi
 
 ### Lỗi Kết Nối MongoDB
+
 - Đảm bảo MongoDB đang chạy trên máy của bạn
 - Kiểm tra `MONGODB_URI` trong file `.env`
 - Xác nhận MongoDB đang lắng nghe trên port mặc định (27017)
 
 ### Port Đã Được Sử Dụng
+
 - Thay đổi `PORT` trong file `.env` của backend
 - Hoặc dừng process đang sử dụng port đó
 
 ### Lỗi Build Frontend
+
 - Xóa `node_modules` và `package-lock.json`
 - Chạy `npm install` lại
-
