@@ -6,12 +6,15 @@ import TodoFilters from "@/components/todo/TodoFilters";
 import ProjectSidebar from "@/components/projects/ProjectSidebar";
 import TaskDetailsModal from "@/components/todo/TaskDetailsModal";
 import LanguageSelector from "@/components/LanguageSelector";
+import ThemeToggle from "@/components/ThemeToggle";
+import { useTheme } from "@/hooks/useTheme";
 import type { Todo, Project } from "@/lib/types";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 
 const HomePage = () => {
   const { t } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
 
   const [todos, setTodos] = useState<Todo[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -336,7 +339,10 @@ const HomePage = () => {
             <h1 className="page-title mb-2">{t("app.title")}</h1>
             <p className="text-muted-foreground">{t("app.subtitle")}</p>
           </div>
-          <LanguageSelector />
+          <div className="flex items-center gap-1">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            <LanguageSelector />
+          </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">

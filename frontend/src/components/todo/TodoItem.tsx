@@ -68,10 +68,10 @@ export default function TodoItem({
   };
 
   const statusColor = todo.completed
-    ? "bg-green-100 border-green-200"
+    ? "bg-green-100 border-green-200 dark:bg-green-950 dark:border-green-800"
     : isOverdue
-      ? "bg-red-100 border-red-200"
-      : "bg-red-100 border-red-200";
+      ? "bg-red-100 border-red-200 dark:bg-red-950 dark:border-red-800"
+      : "bg-card border-border";
 
   if (isEditing) {
     return (
