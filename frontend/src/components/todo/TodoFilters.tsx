@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Search } from "lucide-react";
 
 interface TodoFiltersProps {
@@ -19,6 +20,8 @@ export default function TodoFilters({
   itemsPerPage,
   onItemsPerPageChange,
 }: TodoFiltersProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-4 mb-6">
       {/* Search Field */}
@@ -28,7 +31,7 @@ export default function TodoFilters({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Tìm kiếm công việc..."
+          placeholder={t("filters.search")}
           className="w-full pl-10 pr-4 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
@@ -37,9 +40,9 @@ export default function TodoFilters({
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <div className="flex gap-2">
           {[
-            { value: "all" as const, label: "Tất cả" },
-            { value: "active" as const, label: "Đang làm" },
-            { value: "completed" as const, label: "Đã hoàn thành" },
+            { value: "all" as const, label: t("filters.all") },
+            { value: "active" as const, label: t("filters.active") },
+            { value: "completed" as const, label: t("filters.completed") },
           ].map((filter) => (
             <button
               key={filter.value}
@@ -56,7 +59,7 @@ export default function TodoFilters({
         </div>
         <div className="text-sm text-muted-foreground flex items-center ml-auto gap-4">
           <div className="flex items-center gap-1.5">
-            <span>Hiển thị:</span>
+            <span>{t("filters.show")}</span>
             <select
               value={itemsPerPage}
               onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
@@ -70,7 +73,7 @@ export default function TodoFilters({
           </div>
           <div>
             <span className="font-medium text-foreground">{todoCount}</span>
-            <span className="ml-1">công việc</span>
+            <span className="ml-1">{t("filters.tasks")}</span>
           </div>
         </div>
       </div>

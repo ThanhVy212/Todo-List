@@ -10,8 +10,11 @@ interface TodoListProps {
     id: string,
     title: string,
     description: string,
+    startAt: string | null,
+    endAt: string | null,
   ) => Promise<boolean>;
   editingId: string | null;
+  onViewDetails: (id: string) => void;
 }
 
 export default function TodoList({
@@ -21,6 +24,7 @@ export default function TodoList({
   onEdit,
   onUpdate,
   editingId,
+  onViewDetails,
 }: TodoListProps) {
   return (
     <div className="space-y-3 mt-6">
@@ -31,11 +35,12 @@ export default function TodoList({
           onToggle={() => onToggle(todo.id)}
           onDelete={() => onDelete(todo.id)}
           onEdit={() => onEdit(todo.id)}
-          onUpdate={(title, description) =>
-            onUpdate(todo.id, title, description)
+          onUpdate={(title, description, startAt, endAt) =>
+            onUpdate(todo.id, title, description, startAt, endAt)
           }
           isEditing={editingId === todo.id}
           onEditCancel={() => onEdit(null)}
+          onViewDetails={() => onViewDetails(todo.id)}
         />
       ))}
     </div>

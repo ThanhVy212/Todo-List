@@ -1,0 +1,111 @@
+{
+  "app": {
+    "title": "Todo List",
+    "subtitle": "Manage your tasks efficiently"
+  },
+  "todo": {
+    "addNew": "Add new task",
+    "addTitle": "Add Task",
+    "title": "Title",
+    "titlePlaceholder": "Enter task title",
+    "description": "Description (optional)",
+    "descriptionPlaceholder": "Enter detailed description",
+    "startAt": "Start Time",
+    "endAt": "End Time",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "complete": "Complete",
+    "reactivate": "Reactivate",
+    "overdue": "Overdue",
+    "active": "Active",
+    "completed": "Completed",
+    "pending": "Pending"
+  },
+  "project": {
+    "title": "Projects",
+    "allTasks": "All Tasks",
+    "addNew": "Add Project",
+    "name": "Project Name",
+    "namePlaceholder": "Enter project name",
+    "edit": "Edit Project",
+    "delete": "Delete Project",
+    "deleteConfirm": "Are you sure? Tasks will be ungrouped.",
+    "noProjects": "No projects yet",
+    "createFirst": "Create your first project"
+  },
+  "filters": {
+    "search": "Search tasks...",
+    "all": "All",
+    "active": "Active",
+    "completed": "Completed",
+    "overdue": "Overdue",
+    "show": "Show:",
+    "tasks": "tasks"
+  },
+  "pagination": {
+    "page": "Page",
+    "of": "/",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "details": {
+    "title": "Task Details",
+    "status": "Status",
+    "description": "Description",
+    "startAt": "Start Time",
+    "endAt": "End Time",
+    "createdAt": "Created At",
+    "completedAt": "Completed At",
+    "project": "Project",
+    "noDescription": "No description",
+    "notCompletedYet": "Not completed yet",
+    "noProject": "No project",
+    "noTimeSet": "Not set"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "confirm": "Confirm",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "empty": {
+    "noTasks": "No tasks yet. Add a new task!",
+    "noTasksFiltered": "No matching tasks found",
+    "noProjects": "No projects yet"
+  },
+  "errors": {
+    "required": "This field is required",
+    "invalidDate": "End time must be after start time",
+    "fetchTasks": "Failed to load tasks",
+    "fetchProjects": "Failed to load projects",
+    "createTask": "Failed to create task",
+    "updateTask": "Failed to update task",
+    "deleteTask": "Failed to delete task",
+    "createProject": "Failed to create project",
+    "updateProject": "Failed to update project",
+    "deleteProject": "Failed to delete project"
+  },
+  "success": {
+    "taskCreated": "Task created successfully",
+    "taskUpdated": "Task updated successfully",
+    "taskDeleted": "Task deleted successfully",
+    "taskCompleted": "Task completed",
+    "taskReactivated": "Task reactivated",
+    "projectCreated": "Project created successfully",
+    "projectUpdated": "Project updated successfully",
+    "projectDeleted": "Project deleted successfully"
+  },
+  "notFound": {
+    "title": "404",
+    "heading": "Page not found",
+    "message": "The page you are looking for does not exist or has been moved.",
+    "backHome": "Back to home"
+  }
+}

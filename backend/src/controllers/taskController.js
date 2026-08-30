@@ -2,7 +2,7 @@ import Task from "../models/Task.js";
 
 export const getTasks = async (req, res) => {
   try {
-    const { status, search, page = 1, limit = 10 } = req.query;
+    const { status, search, page = 1, limit = 10, projectId } = req.query;
 
     const currentPage = Math.max(1, Number(page) || 1);
     const limitPerPage = Math.min(Math.max(1, Number(limit) || 10), 100);
@@ -22,6 +22,10 @@ export const getTasks = async (req, res) => {
       }
 
       query.status = status;
+    }
+
+    if (projectId) {
+      query.projectId = projectId;
     }
 
     if (search?.trim()) {
@@ -63,14 +67,23 @@ export const getTasks = async (req, res) => {
 
 export const createTask = async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, description, startAt, endAt, projectId } = req.body;
     if (!title || title.trim() === "") {
       return res.status(400).json({ message: "Tiêu đề công việc là bắt buộc" });
+    }
+
+    if (startAt && endAt && new Date(endAt) < new Date(startAt)) {
+      return res.status(400).json({
+        message: "Thời gian kết thúc phải sau thời gian bắt đầu",
+      });
     }
 
     const newTask = new Task({
       title: title.trim(),
       description: description?.trim() || "",
+      startAt: startAt || null,
+      endAt: endAt || null,
+      projectId: projectId || null,
     });
 
     const savedTask = await newTask.save();
@@ -84,7 +97,7 @@ export const createTask = async (req, res) => {
 export const updateTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, status, description } = req.body;
+    const { title, status, description, startAt, endAt, projectId } = req.body;
 
     const task = await Task.findById(id);
     if (!task) {
@@ -114,6 +127,27 @@ export const updateTask = async (req, res) => {
         task.status = status;
         task.completedAt = status === "complete" ? new Date() : null;
       }
+    }
+
+    if (startAt !== undefined) {
+      task.startAt = startAt || null;
+    }
+
+    if (endAt !== undefined) {
+      task.endAt = endAt || null;
+    }
+
+    const effectiveStart = startAt !== undefined ? startAt : task.startAt;
+    const effectiveEnd = endAt !== undefined ? endAt : task.endAt;
+
+    if (effectiveStart && effectiveEnd && new Date(effectiveEnd) < new Date(effectiveStart)) {
+      return res.status(400).json({
+        message: "Thời gian kết thúc phải sau thời gian bắt đầu",
+      });
+    }
+
+    if (projectId !== undefined) {
+      task.projectId = projectId || null;
     }
 
     const updatedTask = await task.save();

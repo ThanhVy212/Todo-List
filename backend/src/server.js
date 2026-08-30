@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import { connectDB } from "./libs/db.js";
 import taskRoutes from "./routes/taskRoutes.js";
+import projectRoutes from "./routes/projectRoutes.js";
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.use(
 app.use(express.json());
 
 app.use("/api/tasks", taskRoutes);
+app.use("/api/projects", projectRoutes);
 
 connectDB().then(() => {
   app.listen(port, () => {
