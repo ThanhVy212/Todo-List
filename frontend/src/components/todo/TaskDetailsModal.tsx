@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Calendar, Clock, AlertTriangle, FolderKanban } from "lucide-react";
 import type { Todo, Project } from "@/lib/types";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface TaskDetailsModalProps {
   todo: Todo | null;
@@ -10,18 +11,6 @@ interface TaskDetailsModalProps {
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
-}
-
-function formatDateTime(date: Date | null, locale: string): string {
-  if (!date) return "";
-  const d = new Date(date);
-  return d.toLocaleString(locale === "vi" ? "vi-VN" : "en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 export default function TaskDetailsModal({

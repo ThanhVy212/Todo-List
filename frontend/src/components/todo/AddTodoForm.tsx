@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
 import type { Project } from "@/lib/types";
+import { datetimeLocalToISO } from "@/lib/dateUtils";
 
 interface AddTodoFormProps {
   onAdd: (
@@ -38,8 +39,8 @@ export default function AddTodoForm({
     const success = await onAdd(
       title,
       description,
-      startAt || null,
-      endAt || null,
+      datetimeLocalToISO(startAt),
+      datetimeLocalToISO(endAt),
       projectId,
     );
     if (success) {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Trash2, Edit2, Check, X, AlertTriangle } from "lucide-react";
 import type { Todo } from "@/lib/types";
+import { formatDateTime, toDateTimeLocal, datetimeLocalToISO } from "@/lib/dateUtils";
 
 interface TodoItemProps {
   todo: Todo;
@@ -17,25 +18,6 @@ interface TodoItemProps {
   isEditing: boolean;
   onEditCancel: () => void;
   onViewDetails: () => void;
-}
-
-function formatDateTime(date: Date | null, locale: string): string {
-  if (!date) return "";
-  const d = new Date(date);
-  return d.toLocaleString(locale === "vi" ? "vi-VN" : "en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function toDateTimeLocal(date: Date | null): string {
-  if (!date) return "";
-  const d = new Date(date);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export default function TodoItem({
@@ -64,7 +46,12 @@ export default function TodoItem({
       return;
     }
     setDateError("");
-    onUpdate(editTitle, editDescription, editStartAt || null, editEndAt || null);
+    onUpdate(
+      editTitle,
+      editDescription,
+      datetimeLocalToISO(editStartAt),
+      datetimeLocalToISO(editEndAt),
+    );
   };
 
   const statusColor = todo.completed
