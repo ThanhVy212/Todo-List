@@ -1,65 +1,67 @@
+English | [Tiếng Việt](./README.vi.md)
+
 # 📋 TodoList App
 
-> 🗓️ App lên lịch cho ngày của bạn với activity heatmap từng ngày
+> 🗓️ A daily planner app with activity heatmap
 
-## ✨ Tính Năng
+## ✨ Features
 
-### 🔐 Xác Thực
-- Đăng ký & đăng nhập bằng email/password
-- Đăng nhập Google OAuth2
-- Phiên bản JWT
-- Chế độ Demo - dùng thử mà không cần đăng ký (tự xóa sau 2 giờ)
+### 🔐 Authentication
+- Register & login with email/password
+- Google OAuth2 login
+- JWT-based session
+- Demo mode - try the app without signing up (auto-cleanup after 2 hours)
 
-### 📝 Quản Lý Công Việc
-- Tạo, cập nhật, xóa, khôi phục công việc
-- Trạng thái: cần làm, đang làm, hoàn thành, hủy
-- Mức độ ưu tiên: thấp, trung bình, cao
-- Lịch công việc với date picker (không cho chọn ngày quá khứ)
-- Công việc cả ngày hoặc có giờ bắt đầu/kết thúc
-- Hỗ trợ gắn thẻ
-- Tìm kiếm theo tiêu đề/mô tả
-- Lọc theo khoảng ngày, trạng thái, ưu tiên
-- Xóa mềm với thùng rác (tự xóa sau 3 ngày)
-- Phát hiện quá hạn
+### 📝 Task Management
+- Create, update, delete, restore tasks
+- Statuses: todo, in progress, completed, cancelled
+- Priority levels: low, medium, high
+- Schedule tasks with date picker (past dates blocked)
+- All-day tasks or timed tasks (start/end time)
+- Tags support
+- Search by title/description
+- Filter by date range, status, priority
+- Soft delete with trash (auto-purge after 3 days)
+- Overdue detection
 
-### 📁 Dự Án
-- Tạo, đổi tên, xóa dự án
-- Gán công việc vào dự án
-- Đếm số công việc mỗi dự án
+### 📁 Projects
+- Create, rename, delete projects
+- Assign tasks to projects
+- Task count per project
 
-### 📊 Theo Dõi Hoạt Động
-- Biểu đồ nhiệt hoạt động hàng ngày
-- Tự đồng bộ khi tạo/cập nhật/xóa công việc
-- Theo dõi công việc tạo, hoàn thành, xóa theo ngày
+### 📊 Activity Tracking
+- Daily activity heatmap (GitHub-style contribution graph)
+- Auto-sync on task create/update/delete
+- Track created, completed, deleted tasks per day
 
-### 🎨 Giao Diện
-- Chế độ tối/sáng/tự động
-- Đa ngôn ngữ (Tiếng Việt, English)
-- Thiết kế Responsive
-- Thông báo Toast (Sonner)
-- Components Shadcn/ui
+### 🎨 UI/UX
+- Dark/light/system theme toggle
+- Multilingual (Vietnamese, English)
+- Responsive design
+- Toast notifications (Sonner)
+- Shadcn/ui components
 
-## 🛠️ Công Nghệ Sử Dụng
+## 🛠️ Tech Stack
 
 ### Frontend
 - React 19 + TypeScript + Vite
 - Tailwind CSS + shadcn/ui
 - React Router, Axios
-- i18next (đa ngôn ngữ)
-- Sonner (thông báo)
+- i18next (multilingual)
+- Sonner (notifications)
 
 ### Backend
 - Node.js + Express 5
 - MongoDB + Mongoose
-- Xác thực JWT (bcryptjs, jsonwebtoken)
+- JWT authentication (bcryptjs, jsonwebtoken)
 - Zod validation
 
-## 📋 Yêu Cầu
+## 📋 Prerequisites
 
 - Node.js v18+
 - MongoDB
 
-## 🚀 Cài Đặt
+## 🚀 Setup
 
 ```bash
 git clone <repo-url>
@@ -72,7 +74,7 @@ cd backend
 npm install
 ```
 
-Tạo file `.env` trong `backend/`:
+Create `.env` in `backend/`:
 ```env
 PORT=5000
 MONGODB_URI=mongodb://localhost:27017/todolist
@@ -84,7 +86,7 @@ cd frontend
 npm install
 ```
 
-## ▶️ Chạy Ứng Dụng
+## ▶️ Run
 
 ```bash
 # Backend (terminal 1)
@@ -99,24 +101,4 @@ npm run dev
 - Backend: `http://localhost:{PORT}`
 - Frontend: `http://localhost:5173`
 
-## 📁 Cấu Trúc Dự Án
-
-```
-TodoList/
-├── backend/
-│   └── src/
-│       ├── controllers/
-│       ├── middlewares/
-│       ├── models/
-│       ├── routes/
-│       ├── services/
-│       └── server.js
-└── frontend/
-    └── src/
-        ├── components/
-        ├── context/
-        ├── hooks/
-        ├── i18n/
-        ├── pages/
-        └── lib/
-```
+## 📁 Project Structure
