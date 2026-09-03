@@ -1,224 +1,278 @@
-import { useEffect } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
-import { X, Calendar, Clock, AlertTriangle, FolderKanban } from "lucide-react";
-import type { Todo, Project } from "@/lib/types";
-import { formatDateTime } from "@/lib/dateUtils";
+import {
+  X,
+  Calendar,
+  Clock,
+  Tag,
+  CheckCircle2,
+  Trash2,
+  Edit2,
+  Flag,
+  RotateCcw,
+  AlertTriangle,
+} from "lucide-react";
+import type { Task, TaskPriority } from "@/lib/types";
 
 interface TaskDetailsModalProps {
-  todo: Todo | null;
-  projects: Project[];
+  todo: (Task & { isOverdue?: boolean }) | null;
   onClose: () => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  onRestore?: (id: string) => void;
+  onPermanentDelete?: (id: string) => void;
   onEdit: (id: string) => void;
 }
 
-export default function TaskDetailsModal({
+export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   todo,
-  projects,
   onClose,
   onToggle,
   onDelete,
+  onRestore,
+  onPermanentDelete,
   onEdit,
-}: TaskDetailsModalProps) {
+}) => {
   const { t, i18n } = useTranslation();
-
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    if (todo) {
-      document.addEventListener("keydown", handleEsc);
-      document.body.style.overflow = "hidden";
-    }
-    return () => {
-      document.removeEventListener("keydown", handleEsc);
-      document.body.style.overflow = "";
-    };
-  }, [todo, onClose]);
 
   if (!todo) return null;
 
+  const isCompleted = todo.status === "completed";
   const isOverdue =
-    !todo.completed && todo.endAt && new Date(todo.endAt) < new Date();
-  const projectName = todo.projectId
-    ? projects.find((p) => p._id === todo.projectId)?.name || ""
-    : "";
+    Boolean(todo.isOverdue) ||
+    (!todo.isDeleted &&
+      !isCompleted &&
+      todo.endAt &&
+      new Date(todo.endAt) < new Date());
+
+  const formatDateTimeStr = (iso: string | null) => {
+    if (!iso) return t("details.noTimeSet");
+    const d = new Date(iso);
+    return d.toLocaleString(i18n.language === "vi" ? "vi-VN" : "en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getPriorityLabel = (p: TaskPriority) => {
+    switch (p) {
+      case "high":
+        return t("todo.priorityHigh");
+      case "medium":
+        return t("todo.priorityMedium");
+      case "low":
+      default:
+        return t("todo.priorityLow");
+    }
+  };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="relative w-full max-w-lg rounded-lg border border-border bg-card shadow-xl">
-        {/* Header */}
-        <div className="flex items-start justify-between p-6 pb-4">
-          <div className="flex-1 min-w-0 pr-4">
-            <h2 className="text-lg font-bold text-foreground">
-              {t("details.title")}
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-muted transition-colors flex-shrink-0"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-xl">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        {/* Status & Priority Badge */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              isCompleted
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                : todo.isDeleted
+                ? "bg-destructive/10 text-destructive border border-destructive/20"
+                : isOverdue
+                ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                : "bg-primary/10 text-primary border border-primary/20"
+            }`}
           >
-            <X className="h-5 w-5" />
-          </button>
+            {isOverdue && !isCompleted && !todo.isDeleted ? (
+              <AlertTriangle className="h-3.5 w-3.5" />
+            ) : (
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            )}
+            {isCompleted
+              ? t("todo.completed")
+              : todo.isDeleted
+              ? t("details.inTrash")
+              : isOverdue
+              ? t("todo.overdue")
+              : t("todo.active")}
+          </span>
+
+          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+            <Flag className="h-3 w-3 text-muted-foreground" />
+            {getPriorityLabel(todo.priority)}
+          </span>
         </div>
 
-        {/* Content */}
-        <div className="px-6 pb-6 space-y-5">
-          {/* Title & Status */}
-          <div>
-            <h3
-              className={`text-xl font-semibold ${
-                todo.completed
-                  ? "line-through text-foreground/50"
-                  : "text-foreground"
-              }`}
-            >
-              {todo.title}
-            </h3>
-            <div className="flex items-center gap-2 mt-2">
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                  todo.completed
-                    ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                    : isOverdue
-                      ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                      : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                }`}
-              >
-                {todo.completed
-                  ? t("todo.completed")
-                  : isOverdue
-                    ? t("todo.overdue")
-                    : t("todo.active")}
+        {/* Title */}
+        <h3
+          className={`text-xl font-bold tracking-tight text-foreground mb-3 ${
+            isCompleted ? "line-through text-muted-foreground" : ""
+          }`}
+        >
+          {todo.title}
+        </h3>
+
+        {/* Description */}
+        <div className="mb-6 rounded-xl border border-border/60 bg-muted/20 p-3.5">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+            {t("details.description")}
+          </div>
+          <p className="text-sm text-foreground whitespace-pre-wrap">
+            {todo.description || (
+              <span className="italic text-muted-foreground">
+                {t("details.noDescription")}
               </span>
-              {isOverdue && (
-                <span className="inline-flex items-center gap-1 text-xs text-red-600">
-                  <AlertTriangle className="h-3 w-3" />
-                </span>
-              )}
-            </div>
+            )}
+          </p>
+        </div>
+
+        {/* Metadata Details */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mb-6">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="h-4 w-4 text-primary" />
+            <span>
+              {t("todo.scheduledDate")}:{" "}
+              <strong className="text-foreground">
+                {todo.scheduledDateKey || (todo.scheduledDate ? new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(todo.scheduledDate)) : "")}
+              </strong>
+            </span>
           </div>
 
-          {/* Description */}
-          <div>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
-              {t("details.description")}
-            </p>
-            <p className="text-sm text-foreground">
-              {todo.description || (
-                <span className="italic text-muted-foreground">
-                  {t("details.noDescription")}
-                </span>
-              )}
-            </p>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock className="h-4 w-4 text-primary" />
+            <span>
+              {t("todo.startAt")}:{" "}
+              <strong className="text-foreground">
+                {formatDateTimeStr(todo.startAt)}
+              </strong>
+            </span>
           </div>
 
-          {/* Time Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {t("details.startAt")}
-              </p>
-              <p className="text-sm text-foreground">
-                {todo.startAt ? (
-                  formatDateTime(todo.startAt, i18n.language)
-                ) : (
-                  <span className="italic text-muted-foreground">
-                    {t("details.noTimeSet")}
-                  </span>
-                )}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {t("details.endAt")}
-              </p>
-              <p className="text-sm text-foreground">
-                {todo.endAt ? (
-                  formatDateTime(todo.endAt, i18n.language)
-                ) : (
-                  <span className="italic text-muted-foreground">
-                    {t("details.noTimeSet")}
-                  </span>
-                )}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                {t("details.createdAt")}
-              </p>
-              <p className="text-sm text-foreground">
-                {formatDateTime(todo.createdAt, i18n.language)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                {t("details.completedAt")}
-              </p>
-              <p className="text-sm text-foreground">
-                {todo.completedAt ? (
-                  formatDateTime(todo.completedAt, i18n.language)
-                ) : (
-                  <span className="italic text-muted-foreground">
-                    {t("details.notCompletedYet")}
-                  </span>
-                )}
-              </p>
-            </div>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock className="h-4 w-4 text-primary" />
+            <span>
+              {t("todo.endAt")}:{" "}
+              <strong className="text-foreground">
+                {formatDateTimeStr(todo.endAt)}
+              </strong>
+            </span>
           </div>
 
-          {/* Project */}
-          {projectName && (
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <FolderKanban className="h-3 w-3" />
-                {t("details.project")}
-              </p>
-              <p className="text-sm text-foreground">{projectName}</p>
+          {todo.completedAt && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <span>
+                {t("details.completedAt")}:{" "}
+                <strong className="text-foreground">
+                  {formatDateTimeStr(todo.completedAt)}
+                </strong>
+              </span>
             </div>
           )}
+        </div>
 
-          {/* Actions */}
-          <div className="flex gap-2 pt-2">
-            <button
-              onClick={() => onToggle(todo.id)}
-              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                todo.completed
-                  ? "border border-input bg-background hover:bg-muted"
-                  : "bg-green-600 text-white hover:bg-green-700"
-              }`}
-            >
-              {todo.completed ? t("todo.reactivate") : t("todo.complete")}
-            </button>
-            <button
-              onClick={() => {
-                onEdit(todo.id);
-                onClose();
-              }}
-              className="flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
-            >
-              {t("todo.edit")}
-            </button>
-            <button
-              onClick={() => {
-                onDelete(todo.id);
-                onClose();
-              }}
-              className="rounded-md border border-destructive bg-background px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
-            >
-              {t("todo.delete")}
-            </button>
+        {/* Tags */}
+        {todo.tags && todo.tags.length > 0 && (
+          <div className="mb-6">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+              Tags
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {todo.tags.map((tag, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-foreground"
+                >
+                  <Tag className="h-3 w-3 text-muted-foreground" />
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between border-t border-border pt-4">
+          <div className="flex items-center gap-2">
+            {!todo.isDeleted ? (
+              <>
+                <button
+                  onClick={() => onToggle(todo._id)}
+                  className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                    isCompleted
+                      ? "border border-input bg-background text-foreground hover:bg-muted"
+                      : "bg-emerald-600 text-white hover:bg-emerald-700"
+                  }`}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>
+                    {isCompleted ? t("todo.reactivate") : t("todo.complete")}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => onEdit(todo._id)}
+                  className="flex items-center gap-1.5 rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                  <span>{t("common.edit")}</span>
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                {onRestore && (
+                  <button
+                    onClick={() => {
+                      onRestore(todo._id);
+                      onClose();
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>{t("todo.restore")}</span>
+                  </button>
+                )}
+                {onPermanentDelete && (
+                  <button
+                    onClick={() => {
+                      onPermanentDelete(todo._id);
+                      onClose();
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl bg-destructive px-3.5 py-2 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>{t("todo.permanentDelete")}</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!todo.isDeleted && (
+            <button
+              onClick={() => {
+                onDelete(todo._id);
+                onClose();
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-destructive/30 bg-background px-3.5 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>{t("common.delete")}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default TaskDetailsModal;
