@@ -114,8 +114,7 @@ describe("Demo Session - Isolated Guest Sandbox", () => {
   describe("2. Manual demo cleanup", () => {
     it("deletes all demo data on cleanup", async () => {
       const res = await request(app)
-        .post("/api/auth/demo-cleanup")
-        .set("Authorization", `Bearer ${demoToken2}`);
+        .post(`/api/auth/demo-cleanup?token=${encodeURIComponent(demoToken2)}`);
       expect(res.status).toBe(200);
       expect(res.body.message).toContain("success");
 
@@ -131,9 +130,8 @@ describe("Demo Session - Isolated Guest Sandbox", () => {
 
     it("is idempotent — repeated cleanup does not crash the server", async () => {
       const res = await request(app)
-        .post("/api/auth/demo-cleanup")
-        .set("Authorization", `Bearer ${demoToken2}`);
-      // After user deletion, auth middleware returns 401 (user not found)
+        .post(`/api/auth/demo-cleanup?token=${encodeURIComponent(demoToken2)}`);
+      // After user deletion, token lookup returns 401 (user not found)
       expect(res.status).toBe(401);
     });
   });
@@ -155,8 +153,7 @@ describe("Demo Session - Isolated Guest Sandbox", () => {
 
     it("rejects cleanup for non-demo users", async () => {
       const res = await request(app)
-        .post("/api/auth/demo-cleanup")
-        .set("Authorization", `Bearer ${permanentToken}`);
+        .post(`/api/auth/demo-cleanup?token=${encodeURIComponent(permanentToken)}`);
       expect(res.status).toBe(403);
       expect(res.body.message).toContain("only for demo accounts");
 
@@ -173,8 +170,7 @@ describe("Demo Session - Isolated Guest Sandbox", () => {
 
     it("rejects cleanup with an invalid token", async () => {
       const res = await request(app)
-        .post("/api/auth/demo-cleanup")
-        .set("Authorization", "Bearer invalid_token_here");
+        .post("/api/auth/demo-cleanup?token=invalid_token_here");
       expect(res.status).toBe(401);
     });
   });
@@ -197,8 +193,7 @@ describe("Demo Session - Isolated Guest Sandbox", () => {
     afterAll(async () => {
       if (demoId3) {
         await request(app)
-          .post("/api/auth/demo-cleanup")
-          .set("Authorization", `Bearer ${demoToken3}`);
+          .post(`/api/auth/demo-cleanup?token=${encodeURIComponent(demoToken3)}`);
       }
     });
 

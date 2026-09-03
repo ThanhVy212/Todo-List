@@ -37,15 +37,7 @@ async function sendDemoCleanupBeacon(token: string): Promise<void> {
         : import.meta.env.VITE_API_URL || "/api";
 
     navigator.sendBeacon(
-      `${BASE_URL}/auth/demo-cleanup`,
-      new Blob(
-        [
-          JSON.stringify({
-            _auth: token,
-          }),
-        ],
-        { type: "application/json" }
-      )
+      `${BASE_URL}/auth/demo-cleanup?token=${encodeURIComponent(token)}`
     );
   } catch {
     // Best-effort: browser is closing, nothing we can do
@@ -55,20 +47,17 @@ async function sendDemoCleanupBeacon(token: string): Promise<void> {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => {
+  const [pendingAuthCode, setPendingAuthCode] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
-      // Check URL for OAuth token
       const urlParams = new URLSearchParams(window.location.search);
-      const urlToken = urlParams.get("token");
+      const authCode = urlParams.get("auth_code");
       const urlError = urlParams.get("error");
 
-      if (urlToken) {
-        localStorage.setItem("token", urlToken);
-        urlParams.delete("token");
+      if (authCode) {
+        urlParams.delete("auth_code");
         const newSearch = urlParams.toString() ? `?${urlParams.toString()}` : "";
         window.history.replaceState({}, document.title, window.location.pathname + newSearch);
-        toast.add({ title: t("auth.googleLoginSuccess"), type: "success" });
-        return urlToken;
+        return authCode;
       }
 
       if (urlError) {
@@ -77,8 +66,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         window.history.replaceState({}, document.title, window.location.pathname + newSearch);
         toast.add({ title: t("auth.googleLoginFailed"), type: "error" });
       }
-
-      // Prefer demo token from sessionStorage, fallback to permanent token
+    }
+    return null;
+  });
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
       const demoToken = sessionStorage.getItem("demo_token");
       if (demoToken) return demoToken;
     }
@@ -87,6 +79,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [loading, setLoading] = useState<boolean>(true);
   const cleanupListenerRef = useRef<(() => void) | null>(null);
+  const lastExchangedCodeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!pendingAuthCode) return;
+    if (lastExchangedCodeRef.current === pendingAuthCode) return;
+    lastExchangedCodeRef.current = pendingAuthCode;
+
+    const exchangeCode = async () => {
+      try {
+        const res = await api.post("/auth/google/exchange", { code: pendingAuthCode });
+        const { token: jwt } = res.data;
+        clearDemoSession();
+        localStorage.setItem("token", jwt);
+        setToken(jwt);
+        toast.add({ title: t("auth.googleLoginSuccess"), type: "success" });
+      } catch {
+        toast.add({ title: t("auth.googleLoginFailed"), type: "error" });
+      } finally {
+        setPendingAuthCode(null);
+      }
+    };
+
+    exchangeCode();
+  }, [pendingAuthCode, t]);
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -141,6 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const res = await api.post("/auth/login", { email, password });
+      clearDemoSession();
       localStorage.setItem("token", res.data.token);
       setToken(res.data.token);
       setUser(res.data.user);
@@ -165,6 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
         timezone,
       });
+      clearDemoSession();
       localStorage.setItem("token", res.data.token);
       setToken(res.data.token);
       setUser(res.data.user);
@@ -196,7 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isDemo && currentToken) {
       try {
-        await api.post("/auth/demo-cleanup");
+        await api.post(`/auth/demo-cleanup?token=${encodeURIComponent(currentToken)}`);
       } catch {
         // Cleanup failed — still clear local state
       }

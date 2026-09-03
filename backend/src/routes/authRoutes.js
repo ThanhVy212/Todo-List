@@ -6,6 +6,7 @@ import {
   updateMe,
   redirectToGoogle,
   handleGoogleCallback,
+  exchangeAuthCode,
   demoLogin,
   demoCleanup,
   registerSchema,
@@ -31,9 +32,10 @@ router.put(
 // Google OAuth
 router.get("/google", redirectToGoogle);
 router.get("/callback/google", handleGoogleCallback);
+router.post("/google/exchange", exchangeAuthCode);
 
 // Demo session
 router.post("/demo-login", demoLogin);
-router.post("/demo-cleanup", requireAuth, demoCleanup);
+router.post("/demo-cleanup", demoCleanup);
 
 export default router;

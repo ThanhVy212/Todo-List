@@ -9,6 +9,10 @@ import {
   syncTaskRestored,
 } from "../services/activityService.js";
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // Validation Schemas
 export const createTaskSchema = z.object({
   title: z.string().min(1, "Tiêu đề công việc là bắt buộc").max(200, "Tiêu đề tối đa 200 ký tự").trim(),
@@ -98,9 +102,10 @@ export const getTasks = async (req, res) => {
     }
 
     if (search && search.trim()) {
+      const escaped = escapeRegex(search.trim());
       query.$or = [
-        { title: { $regex: search.trim(), $options: "i" } },
-        { description: { $regex: search.trim(), $options: "i" } },
+        { title: { $regex: escaped, $options: "i" } },
+        { description: { $regex: escaped, $options: "i" } },
       ];
     }
 

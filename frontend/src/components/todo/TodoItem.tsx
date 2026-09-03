@@ -27,6 +27,14 @@ interface TodoItemProps {
   onViewDetails: (id: string) => void;
 }
 
+function toLocalDatetime(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export const TodoItem: React.FC<TodoItemProps> = ({
   todo,
   onToggle,
@@ -45,12 +53,8 @@ export const TodoItem: React.FC<TodoItemProps> = ({
   const [editDescription, setEditDescription] = useState(todo.description);
   const [editPriority, setEditPriority] = useState<TaskPriority>(todo.priority);
   const [editStatus, setEditStatus] = useState<TaskStatus>(todo.status);
-  const [editStartAt, setEditStartAt] = useState(
-    todo.startAt ? new Date(todo.startAt).toISOString().slice(0, 16) : ""
-  );
-  const [editEndAt, setEditEndAt] = useState(
-    todo.endAt ? new Date(todo.endAt).toISOString().slice(0, 16) : ""
-  );
+  const [editStartAt, setEditStartAt] = useState(toLocalDatetime(todo.startAt));
+  const [editEndAt, setEditEndAt] = useState(toLocalDatetime(todo.endAt));
   const [dateError, setDateError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ title?: string }>({});
 

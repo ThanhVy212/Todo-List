@@ -2,6 +2,7 @@ import DailyActivity from "../models/DailyActivity.js";
 import Task from "../models/Task.js";
 import {
   getDateKey,
+  getDateRangeInUTC,
   shiftDateKey,
   enumerateDateKeys,
   getDaysDifference,
@@ -57,6 +58,9 @@ export const getActivities = async (req, res) => {
     }
 
     // Fetch DailyActivity documents for this user in this range
+    const { startOfDayUTC: schedStart } = getDateRangeInUTC(from, userTimezone);
+    const { endOfDayUTC: schedEnd } = getDateRangeInUTC(to, userTimezone);
+
     const [activities, tasksInRange] = await Promise.all([
       DailyActivity.find({
         userId,
@@ -65,6 +69,7 @@ export const getActivities = async (req, res) => {
       Task.find({
         userId,
         isDeleted: false,
+        scheduledDate: { $gte: schedStart, $lte: schedEnd },
       })
         .select("scheduledDate status completedAt endAt")
         .lean(),

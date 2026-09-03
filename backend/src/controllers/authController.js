@@ -7,6 +7,57 @@ import Task from "../models/Task.js";
 import DailyActivity from "../models/DailyActivity.js";
 import { JWT_SECRET } from "../middlewares/auth.js";
 
+const GOOGLE_CALLBACK_URL =
+  process.env.GOOGLE_CALLBACK_URL || "http://localhost:8000/api/auth/callback/google";
+
+// In-memory OAuth state store (single-server only)
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const oauthStateStore = new Map();
+
+function generateOAuthState() {
+  const state = crypto.randomBytes(32).toString("hex");
+  oauthStateStore.set(state, Date.now() + OAUTH_STATE_TTL_MS);
+  return state;
+}
+
+function consumeOAuthState(state) {
+  if (!state) return false;
+  const expiresAt = oauthStateStore.get(state);
+  if (expiresAt === undefined) return false;
+  oauthStateStore.delete(state);
+  return Date.now() <= expiresAt;
+}
+
+function parseCookies(header) {
+  const cookies = {};
+  if (!header) return cookies;
+  for (const pair of header.split(";")) {
+    const [name, ...rest] = pair.split("=");
+    const value = rest.join("=").trim();
+    if (name) cookies[name.trim()] = decodeURIComponent(value);
+  }
+  return cookies;
+}
+
+// One-time auth code store for OAuth token exchange (single-server only)
+const AUTH_CODE_TTL_MS = 60 * 1000; // 60 seconds
+const authCodeStore = new Map(); // code → { token, expiresAt }
+
+function generateAuthCode(token) {
+  const code = crypto.randomBytes(24).toString("hex");
+  authCodeStore.set(code, { token, expiresAt: Date.now() + AUTH_CODE_TTL_MS });
+  return code;
+}
+
+function consumeAuthCode(code) {
+  if (!code) return null;
+  const entry = authCodeStore.get(code);
+  if (!entry) return null;
+  authCodeStore.delete(code);
+  if (Date.now() > entry.expiresAt) return null;
+  return entry.token;
+}
+
 // Validation Schemas
 export const registerSchema = z.object({
   fullName: z.string().min(1, "Họ và tên là bắt buộc").trim(),
@@ -167,8 +218,6 @@ export const updateMe = async (req, res) => {
  */
 export const redirectToGoogle = (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const callbackUrl =
-    process.env.GOOGLE_CALLBACK_URL || "http://localhost:8000/api/auth/google/callback";
 
   if (!clientId || clientId === "YOUR_GOOGLE_CLIENT_ID") {
     return res.status(500).json({
@@ -177,10 +226,19 @@ export const redirectToGoogle = (req, res) => {
     });
   }
 
+  const state = generateOAuthState();
+
+  res.cookie("oauth_state", state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: OAUTH_STATE_TTL_MS,
+  });
+
   const scope = encodeURIComponent("openid profile email");
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-    callbackUrl
-  )}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account`;
+    GOOGLE_CALLBACK_URL
+  )}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account&state=${encodeURIComponent(state)}`;
 
   return res.redirect(googleAuthUrl);
 };
@@ -189,14 +247,20 @@ export const redirectToGoogle = (req, res) => {
  * Handle Google OAuth callback
  */
 export const handleGoogleCallback = async (req, res) => {
-  const { code, error } = req.query;
+  const { code, error, state } = req.query;
 
   const frontendUrl =
       process.env.FRONTEND_URL || "http://localhost:5173";
 
-  const callbackUrl =
-      process.env.GOOGLE_CALLBACK_URL ||
-      "http://localhost:8000/api/auth/callback/google";
+  const cookies = parseCookies(req.headers.cookie);
+  const cookieState = cookies.oauth_state;
+
+  res.clearCookie("oauth_state", { httpOnly: true, sameSite: "lax" });
+
+  if (!state || !cookieState || state !== cookieState || !consumeOAuthState(state)) {
+    console.error("Google OAuth state mismatch or reused state");
+    return res.redirect(`${frontendUrl}/?error=google_auth_invalid_state`);
+  }
 
   if (error || !code) {
     console.error("Google OAuth error or cancelled:", error);
@@ -211,7 +275,7 @@ export const handleGoogleCallback = async (req, res) => {
       throw new Error("Missing Google OAuth or JWT environment variables");
     }
 
-    console.log("Google OAuth callback URL:", callbackUrl);
+    console.log("Google OAuth callback URL:", GOOGLE_CALLBACK_URL);
 
     const tokenResponse = await fetch(
         "https://oauth2.googleapis.com/token",
@@ -224,7 +288,7 @@ export const handleGoogleCallback = async (req, res) => {
             code: String(code),
             client_id: clientId,
             client_secret: clientSecret,
-            redirect_uri: callbackUrl,
+            redirect_uri: GOOGLE_CALLBACK_URL,
             grant_type: "authorization_code",
           }),
         }
@@ -317,8 +381,10 @@ export const handleGoogleCallback = async (req, res) => {
         }
     );
 
+    const authCode = generateAuthCode(token);
+
     return res.redirect(
-        `${frontendUrl}/?token=${encodeURIComponent(token)}`
+        `${frontendUrl}/?auth_code=${encodeURIComponent(authCode)}`
     );
   } catch (err) {
     console.error("handleGoogleCallback error:", err);
@@ -327,6 +393,20 @@ export const handleGoogleCallback = async (req, res) => {
         `${frontendUrl}/?error=google_auth_server_error`
     );
   }
+};
+
+/**
+ * Exchange a short-lived one-time auth code for the JWT token
+ */
+export const exchangeAuthCode = async (req, res) => {
+  const { code } = req.body || {};
+
+  const token = consumeAuthCode(code);
+  if (!token) {
+    return res.status(400).json({ message: "Mã xác thực không hợp lệ hoặc đã hết hạn." });
+  }
+
+  return res.status(200).json({ token });
 };
 
 const DEMO_SESSION_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -369,10 +449,27 @@ export const demoLogin = async (req, res) => {
 
 /**
  * Clean up all data owned by a demo user. Idempotent.
+ * Authenticates via ?token= query parameter (used by sendBeacon on page unload).
  */
 export const demoCleanup = async (req, res) => {
   try {
-    const user = req.user;
+    const token = req.query.token;
+
+    if (!token) {
+      return res.status(401).json({ message: "Token is required." });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch {
+      return res.status(401).json({ message: "Invalid or expired token." });
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ message: "User not found." });
+    }
 
     if (!user.isDemo) {
       return res.status(403).json({ message: "This endpoint is only for demo accounts." });

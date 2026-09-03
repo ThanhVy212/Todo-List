@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
@@ -55,6 +55,9 @@ export const HomePage: React.FC = () => {
     longestStreak: 0,
   });
 
+  const activitiesAbortRef = useRef<AbortController | null>(null);
+  const tasksAbortRef = useRef<AbortController | null>(null);
+
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -71,25 +74,38 @@ export const HomePage: React.FC = () => {
   // Fetch Activities for Heatmap (by selected year)
   const fetchActivities = useCallback(async () => {
     if (!token) return;
+    activitiesAbortRef.current?.abort();
+    const controller = new AbortController();
+    activitiesAbortRef.current = controller;
     setLoadingActivities(true);
     try {
       const res = await api.get("/activities", {
         params: { year: selectedYear },
+        signal: controller.signal,
       });
-      setActivities(res.data.data);
-      if (res.data.stats) {
-        setStats(res.data.stats);
+      if (!controller.signal.aborted) {
+        setActivities(res.data.data);
+        if (res.data.stats) {
+          setStats(res.data.stats);
+        }
       }
     } catch (err: any) {
-      console.error("fetchActivities error:", err);
+      if (err.name !== "CanceledError" && err.name !== "AbortError") {
+        console.error("fetchActivities error:", err);
+      }
     } finally {
-      setLoadingActivities(false);
+      if (!controller.signal.aborted) {
+        setLoadingActivities(false);
+      }
     }
   }, [token, selectedYear]);
 
   // Fetch Tasks for the selected date
   const fetchTasks = useCallback(async () => {
     if (!token) return;
+    tasksAbortRef.current?.abort();
+    const controller = new AbortController();
+    tasksAbortRef.current = controller;
     setLoadingTasks(true);
     try {
       const params: Record<string, any> = {
@@ -109,13 +125,19 @@ export const HomePage: React.FC = () => {
         params.search = searchQuery.trim();
       }
 
-      const res = await api.get("/tasks", { params });
-      setTasks(res.data.data);
+      const res = await api.get("/tasks", { params, signal: controller.signal });
+      if (!controller.signal.aborted) {
+        setTasks(res.data.data);
+      }
     } catch (err: any) {
-      console.error("fetchTasks error:", err);
-      toast.add({ title: err.response?.data?.message || t("errors.fetchTasks"), type: "error" });
+      if (err.name !== "CanceledError" && err.name !== "AbortError") {
+        console.error("fetchTasks error:", err);
+        toast.add({ title: err.response?.data?.message || t("errors.fetchTasks"), type: "error" });
+      }
     } finally {
-      setLoadingTasks(false);
+      if (!controller.signal.aborted) {
+        setLoadingTasks(false);
+      }
     }
   }, [token, selectedDate, statusFilter, priorityFilter, searchQuery, t]);
 
