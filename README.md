@@ -1,163 +1,122 @@
-# 📋 TodoList Application
+# 📋 TodoList App
 
-Ứng dụng Todo full-stack với frontend React và backend Express.js với MongoDB.
+> 🗓️ App lên lịch cho ngày của bạn với activity heatmap từng ngày
 
-## 🚀 Công Nghệ Sử Dụng
+## ✨ Tính Năng
+
+### 🔐 Xác Thực
+- Đăng ký & đăng nhập bằng email/password
+- Đăng nhập Google OAuth2
+- Phiên bản JWT
+- Chế độ Demo - dùng thử mà không cần đăng ký (tự xóa sau 2 giờ)
+
+### 📝 Quản Lý Công Việc
+- Tạo, cập nhật, xóa, khôi phục công việc
+- Trạng thái: cần làm, đang làm, hoàn thành, hủy
+- Mức độ ưu tiên: thấp, trung bình, cao
+- Lịch công việc với date picker (không cho chọn ngày quá khứ)
+- Công việc cả ngày hoặc có giờ bắt đầu/kết thúc
+- Hỗ trợ gắn thẻ
+- Tìm kiếm theo tiêu đề/mô tả
+- Lọc theo khoảng ngày, trạng thái, ưu tiên
+- Xóa mềm với thùng rác (tự xóa sau 3 ngày)
+- Phát hiện quá hạn
+
+### 📁 Dự Án
+- Tạo, đổi tên, xóa dự án
+- Gán công việc vào dự án
+- Đếm số công việc mỗi dự án
+
+### 📊 Theo Dõi Hoạt Động
+- Biểu đồ nhiệt hoạt động hàng ngày
+- Tự đồng bộ khi tạo/cập nhật/xóa công việc
+- Theo dõi công việc tạo, hoàn thành, xóa theo ngày
+
+### 🎨 Giao Diện
+- Chế độ tối/sáng/tự động
+- Đa ngôn ngữ (Tiếng Việt, English)
+- Thiết kế Responsive
+- Thông báo Toast (Sonner)
+- Components Shadcn/ui
+
+## 🛠️ Công Nghệ Sử Dụng
 
 ### Frontend
-
-- **React 19** - Thư viện UI
-- **TypeScript** - Kiểm tra kiểu dữ liệu
-- **Vite** - Build tool và dev server
-- **Tailwind CSS** - Styling
-- **shadcn/ui** - UI components
-- **React Router** - Điều hướng
-- **Axios** - HTTP client
+- React 19 + TypeScript + Vite
+- Tailwind CSS + shadcn/ui
+- React Router, Axios
+- i18next (đa ngôn ngữ)
+- Sonner (thông báo)
 
 ### Backend
+- Node.js + Express 5
+- MongoDB + Mongoose
+- Xác thực JWT (bcryptjs, jsonwebtoken)
+- Zod validation
 
-- **Node.js** - Runtime environment
-- **Express.js** - Web framework
-- **MongoDB** - Database
-- **Mongoose** - ODM cho MongoDB
-- **CORS** - Cross-origin resource sharing
+## 📋 Yêu Cầu
 
-## 📋 Yêu Cầu Trước Khi Cài Đặt
+- Node.js v18+
+- MongoDB
 
-Trước khi chạy dự án, đảm bảo bạn đã cài đặt:
-
-- **Node.js** (v18 hoặc cao hơn) - [Tải tại đây](https://nodejs.org/)
-- **MongoDB** - [Tải tại đây](https://www.mongodb.com/try/download/community)
-- **npm** (đi kèm với Node.js) hoặc **yarn**
-
-## 🛠️ Cài Đặt
-
-### 1. Clone repository
+## 🚀 Cài Đặt
 
 ```bash
-git clone <your-repository-url>
+git clone <repo-url>
 cd TodoList
 ```
 
-### 2. Cài đặt Backend
-
-Di chuyển vào thư mục backend:
-
+**Backend:**
 ```bash
 cd backend
-```
-
-Cài đặt dependencies:
-
-```bash
 npm install
 ```
 
-Tạo file `.env` trong thư mục `backend` với các biến sau:
-
+Tạo file `.env` trong `backend/`:
 ```env
 PORT=5000
 MONGODB_URI=mongodb://localhost:27017/todolist
 ```
 
-### 3. Cài đặt Frontend
-
-Di chuyển vào thư mục frontend:
-
+**Frontend:**
 ```bash
-cd ../frontend
-```
-
-Cài đặt dependencies:
-
-```bash
+cd frontend
 npm install
 ```
 
-## 🏃 Chạy Ứng Dụng
-
-### Khởi động Backend
-
-Trong thư mục `backend`:
+## ▶️ Chạy Ứng Dụng
 
 ```bash
+# Backend (terminal 1)
+cd backend
+npm run dev
+
+# Frontend (terminal 2)
+cd frontend
 npm run dev
 ```
 
-Backend server sẽ chạy tại `http://localhost:PORT`
-setup PORT trong file `.env` của backend
-
-### Khởi động Frontend
-
-Trong thư mục `frontend` (mở terminal mới):
-
-```bash
-npm run dev
-```
-
-Frontend sẽ chạy tại `http://localhost:5173`
+- Backend: `http://localhost:{PORT}`
+- Frontend: `http://localhost:5173`
 
 ## 📁 Cấu Trúc Dự Án
 
 ```
 TodoList/
 ├── backend/
-│   ├── src/
-│   │   ├── controllers/
-│   │   ├── libs/
-│   │   ├── models/
-│   │   ├── routes/
-│   │   └── server.js
-│   ├── .env
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   └── ...
-│   ├── index.html
-│   └── package.json
-└── README.md
+│   └── src/
+│       ├── controllers/
+│       ├── middlewares/
+│       ├── models/
+│       ├── routes/
+│       ├── services/
+│       └── server.js
+└── frontend/
+    └── src/
+        ├── components/
+        ├── context/
+        ├── hooks/
+        ├── i18n/
+        ├── pages/
+        └── lib/
 ```
-
-## 🔧 Các Lệnh Có Sẵn
-
-### Backend
-
-- `npm run dev` - Khởi động server với nodemon (development)
-- `npm start` - Khởi động server (production)
-- `npm test` - Chạy tests
-
-### Frontend
-
-- `npm run dev` - Khởi động development server
-- `npm run build` - Build cho production
-- `npm run lint` - Chạy linter
-- `npm run preview` - Xem trước production build
-
-## 🌐 API Endpoints
-
-Backend API cung cấp các endpoints sau:
-
-- `GET /api/todos` - Lấy tất cả todos
-- `POST /api/todos` - Tạo todo mới
-- `PUT /api/todos/:id` - Cập nhật todo
-- `DELETE /api/todos/:id` - Xóa todo
-
-## 🐛 Xử Lý Lỗi
-
-### Lỗi Kết Nối MongoDB
-
-- Đảm bảo MongoDB đang chạy trên máy của bạn
-- Kiểm tra `MONGODB_URI` trong file `.env`
-- Xác nhận MongoDB đang lắng nghe trên port mặc định (27017)
-
-### Port Đã Được Sử Dụng
-
-- Thay đổi `PORT` trong file `.env` của backend
-- Hoặc dừng process đang sử dụng port đó
-
-### Lỗi Build Frontend
-
-- Xóa `node_modules` và `package-lock.json`
-- Chạy `npm install` lại
