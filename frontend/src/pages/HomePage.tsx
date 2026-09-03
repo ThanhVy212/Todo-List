@@ -1,511 +1,479 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import TodoList from "@/components/todo/TodoList";
-import AddTodoForm from "@/components/todo/AddTodoForm";
-import TodoFilters from "@/components/todo/TodoFilters";
-import ProjectSidebar from "@/components/projects/ProjectSidebar";
-import TaskDetailsModal from "@/components/todo/TaskDetailsModal";
+import { useAuth } from "@/context/AuthContext";
+import { DailyActivityHeatmap } from "@/components/heatmap/DailyActivityHeatmap";
+import { DatePickerNav } from "@/components/todo/DatePickerNav";
+import { AddTodoForm } from "@/components/todo/AddTodoForm";
+import { TodoList } from "@/components/todo/TodoList";
+import { TodoFilters } from "@/components/todo/TodoFilters";
+import { TaskDetailsModal } from "@/components/todo/TaskDetailsModal";
+import { TaskSkeleton } from "@/components/todo/TaskSkeleton";
+import { AuthModal } from "@/components/auth/AuthModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import LanguageSelector from "@/components/LanguageSelector";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useTheme } from "@/hooks/useTheme";
-import type { Todo, Project } from "@/lib/types";
 import api from "@/lib/axios";
-import { toast } from "sonner";
+import type { Task, DailyActivityItem, ActivityStats, TaskPriority, TaskStatus } from "@/lib/types";
+import { toast } from "@/components/ui/toast";
+import { LogIn, LogOut, Sparkles, AlertTriangle } from "lucide-react";
 
-const HomePage = () => {
+export const HomePage: React.FC = () => {
   const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
+  const { user, token, logout, demoLogin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const userTimezone = user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Ho_Chi_Minh";
+  const getTodayKey = () =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: userTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
+  const todayKey = getTodayKey();
+  const selectedDate = searchParams.get("date") || todayKey;
+  const isPastDate = selectedDate < todayKey;
+
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+
+  const handleDateChange = (newDate: string) => {
+    setSearchParams({ date: newDate });
+  };
+
+  // State
+  const [tasks, setTasks] = useState<(Task & { isOverdue?: boolean })[]>([]);
+  const [activities, setActivities] = useState<DailyActivityItem[]>([]);
+  const [stats, setStats] = useState<ActivityStats>({
+    totalCompleted: 0,
+    activeDays: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+  });
+
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [loadingActivities, setLoadingActivities] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "active" | "completed"
-  >("all");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<"all" | TaskStatus | "trash">("all");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [projectsLoading, setProjectsLoading] = useState(false);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  // AlertDialog confirm states
+  const [permanentDeleteTargetId, setPermanentDeleteTargetId] = useState<string | null>(null);
+  const [isEmptyTrashConfirmOpen, setIsEmptyTrashConfirmOpen] = useState(false);
 
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-      setCurrentPage(1);
-    }, 300);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [searchQuery]);
-
-  const fetchProjects = async () => {
-    setProjectsLoading(true);
+  // Fetch Activities for Heatmap (by selected year)
+  const fetchActivities = useCallback(async () => {
+    if (!token) return;
+    setLoadingActivities(true);
     try {
-      const response = await api.get("/projects");
-      setProjects(response.data.data);
-    } catch (error: any) {
-      console.error("Error fetching projects:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          t("errors.fetchProjects"),
-      );
-    } finally {
-      setProjectsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  const fetchTodos = async () => {
-    setLoading(true);
-    try {
-      let status: "active" | "complete" | undefined = undefined;
-      if (statusFilter === "active") status = "active";
-      else if (statusFilter === "completed") status = "complete";
-
-      const response = await api.get("/tasks", {
-        params: {
-          page: currentPage,
-          limit: itemsPerPage,
-          status,
-          search: debouncedSearchQuery || undefined,
-          projectId: selectedProjectId || undefined,
-        },
+      const res = await api.get("/activities", {
+        params: { year: selectedYear },
       });
-
-      const { data, pagination } = response.data;
-
-      const mappedTodos: Todo[] = data.map((item: any) => ({
-        id: item._id,
-        title: item.title,
-        description: item.description || "",
-        completed: item.status === "complete",
-        projectId: item.projectId || null,
-        startAt: item.startAt ? new Date(item.startAt) : null,
-        endAt: item.endAt ? new Date(item.endAt) : null,
-        createdAt: new Date(item.createdAt),
-        completedAt: item.completedAt ? new Date(item.completedAt) : null,
-      }));
-
-      setTodos(mappedTodos);
-      setTotalPages(pagination.totalPages || 1);
-      setTotalCount(pagination.total || 0);
-    } catch (error: any) {
-      console.error("Error fetching tasks:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          t("errors.fetchTasks"),
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTodos();
-  }, [currentPage, statusFilter, debouncedSearchQuery, itemsPerPage, selectedProjectId]);
-
-  const handleFilterChange = (newFilter: "all" | "active" | "completed") => {
-    setStatusFilter(newFilter);
-    setCurrentPage(1);
-  };
-
-  const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
-  };
-
-  const addTodo = async (
-    title: string,
-    description: string,
-    startAt: string | null,
-    endAt: string | null,
-    projectId: string | null,
-  ): Promise<boolean> => {
-    try {
-      await api.post("/tasks", {
-        title,
-        description,
-        startAt,
-        endAt,
-        projectId,
-      });
-      toast.success(t("success.taskCreated"));
-      fetchProjects();
-      if (currentPage === 1) {
-        fetchTodos();
-      } else {
-        setCurrentPage(1);
+      setActivities(res.data.data);
+      if (res.data.stats) {
+        setStats(res.data.stats);
       }
+    } catch (err: any) {
+      console.error("fetchActivities error:", err);
+    } finally {
+      setLoadingActivities(false);
+    }
+  }, [token, selectedYear]);
+
+  // Fetch Tasks for the selected date
+  const fetchTasks = useCallback(async () => {
+    if (!token) return;
+    setLoadingTasks(true);
+    try {
+      const params: Record<string, any> = {
+        date: statusFilter === "trash" ? undefined : selectedDate,
+        includeDeleted: statusFilter === "trash" ? "true" : "false",
+      };
+
+      if (statusFilter !== "all" && statusFilter !== "trash") {
+        params.status = statusFilter;
+      }
+
+      if (priorityFilter !== "all") {
+        params.priority = priorityFilter;
+      }
+
+      if (searchQuery.trim()) {
+        params.search = searchQuery.trim();
+      }
+
+      const res = await api.get("/tasks", { params });
+      setTasks(res.data.data);
+    } catch (err: any) {
+      console.error("fetchTasks error:", err);
+      toast.add({ title: err.response?.data?.message || t("errors.fetchTasks"), type: "error" });
+    } finally {
+      setLoadingTasks(false);
+    }
+  }, [token, selectedDate, statusFilter, priorityFilter, searchQuery, t]);
+
+  useEffect(() => {
+    if (token) {
+      fetchActivities();
+    } else {
+      setActivities([]);
+    }
+  }, [token, selectedYear, fetchActivities]);
+
+  useEffect(() => {
+    if (token) {
+      fetchTasks();
+    } else {
+      setTasks([]);
+    }
+  }, [token, selectedDate, statusFilter, priorityFilter, searchQuery, fetchTasks]);
+
+  // Create task
+  const handleAddTask = async (taskData: {
+    title: string;
+    description: string;
+    priority: TaskPriority;
+    scheduledDate: string;
+    startAt: string | null;
+    endAt: string | null;
+    isAllDay: boolean;
+    tags: string[];
+  }): Promise<boolean> => {
+    if (!token) {
+      setIsAuthModalOpen(true);
+      return false;
+    }
+
+    try {
+      await api.post("/tasks", taskData);
+      toast.add({ title: t("success.taskCreated"), type: "success" });
+      fetchTasks();
+      fetchActivities();
       return true;
-    } catch (error: any) {
-      console.error("Error adding task:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          t("errors.createTask"),
-      );
+    } catch (err: any) {
+      console.error("handleAddTask error:", err);
+      toast.add({ title: err.response?.data?.message || t("errors.createTask"), type: "error" });
       return false;
     }
   };
 
-  const deleteTodo = async (id: string) => {
+  // Toggle complete / uncomplete with optimistic UI update
+  const handleToggleTask = async (id: string) => {
+    const task = tasks.find((t) => t._id === id);
+    if (!task) return;
+
+    const isCurrentlyCompleted = task.status === "completed";
+    const newStatus: TaskStatus = isCurrentlyCompleted ? "todo" : "completed";
+
+    const previousTasks = [...tasks];
+    setTasks(
+      tasks.map((t) =>
+        t._id === id
+          ? {
+              ...t,
+              status: newStatus,
+              completedAt: isCurrentlyCompleted ? null : new Date().toISOString(),
+            }
+          : t
+      )
+    );
+
     try {
-      const response = await api.delete(`/tasks/${id}`);
-      toast.success(response.data?.message || t("success.taskDeleted"));
-      fetchProjects();
-      if (todos.length === 1 && currentPage > 1) {
-        setCurrentPage((prev) => prev - 1);
-      } else {
-        fetchTodos();
-      }
-    } catch (error: any) {
-      console.error("Error deleting task:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          t("errors.deleteTask"),
-      );
+      const endpoint = isCurrentlyCompleted ? `/tasks/${id}/uncomplete` : `/tasks/${id}/complete`;
+      await api.post(endpoint);
+      toast.add({
+        title: isCurrentlyCompleted ? t("success.taskReactivated") : t("success.taskCompleted"),
+        type: "success",
+      });
+      fetchActivities();
+    } catch (err: any) {
+      setTasks(previousTasks);
+      toast.add({ title: err.response?.data?.message || t("errors.updateTask"), type: "error" });
     }
   };
 
-  const toggleTodo = async (id: string) => {
-    const todoToToggle = todos.find((todo) => todo.id === id);
-    if (!todoToToggle) return;
-
-    const newStatus = todoToToggle.completed ? "active" : "complete";
-
+  // Update task
+  const handleUpdateTask = async (id: string, updates: Partial<Task>): Promise<boolean> => {
     try {
-      await api.put(`/tasks/${id}`, {
-        status: newStatus,
-      });
-      toast.success(
-        newStatus === "complete"
-          ? t("success.taskCompleted")
-          : t("success.taskReactivated"),
-      );
-      fetchTodos();
-    } catch (error: any) {
-      console.error("Error toggling task:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          t("errors.updateTask"),
-      );
-    }
-  };
-
-  const updateTodo = async (
-    id: string,
-    title: string,
-    description: string,
-    startAt: string | null,
-    endAt: string | null,
-  ): Promise<boolean> => {
-    try {
-      await api.put(`/tasks/${id}`, {
-        title,
-        description,
-        startAt,
-        endAt,
-      });
-      toast.success(t("success.taskUpdated"));
+      await api.put(`/tasks/${id}`, updates);
+      toast.add({ title: t("success.taskUpdated"), type: "success" });
       setEditingId(null);
-      fetchTodos();
+      fetchTasks();
+      fetchActivities();
       return true;
-    } catch (error: any) {
-      console.error("Error updating task:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          t("errors.updateTask"),
-      );
+    } catch (err: any) {
+      toast.add({ title: err.response?.data?.message || t("errors.updateTask"), type: "error" });
       return false;
     }
   };
 
-  const addProject = async (name: string): Promise<boolean> => {
+  // Soft delete task
+  const handleDeleteTask = async (id: string) => {
     try {
-      await api.post("/projects", { name });
-      toast.success(t("success.projectCreated"));
-      fetchProjects();
-      return true;
-    } catch (error: any) {
-      console.error("Error creating project:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          t("errors.createProject"),
-      );
-      return false;
+      await api.delete(`/tasks/${id}`);
+      toast.add({ title: t("success.taskDeleted"), type: "success" });
+      fetchTasks();
+      fetchActivities();
+    } catch (err: any) {
+      toast.add({ title: err.response?.data?.message || t("errors.deleteTask"), type: "error" });
     }
   };
 
-  const updateProject = async (id: string, name: string): Promise<boolean> => {
+  // Restore task
+  const handleRestoreTask = async (id: string) => {
     try {
-      await api.put(`/projects/${id}`, { name });
-      toast.success(t("success.projectUpdated"));
-      fetchProjects();
-      return true;
-    } catch (error: any) {
-      console.error("Error updating project:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          t("errors.updateProject"),
-      );
-      return false;
+      await api.post(`/tasks/${id}/restore`);
+      toast.add({ title: t("todo.restoreSuccess"), type: "success" });
+      fetchTasks();
+      fetchActivities();
+    } catch (err: any) {
+      toast.add({ title: err.response?.data?.message || t("errors.updateTask"), type: "error" });
     }
   };
 
-  const deleteProject = async (id: string): Promise<boolean> => {
+  // Confirm and permanently delete single task
+  const confirmPermanentDelete = async () => {
+    if (!permanentDeleteTargetId) return;
     try {
-      await api.delete(`/projects/${id}`);
-      toast.success(t("success.projectDeleted"));
-      if (selectedProjectId === id) {
-        setSelectedProjectId(null);
-      }
-      fetchProjects();
-      return true;
-    } catch (error: any) {
-      console.error("Error deleting project:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          t("errors.deleteProject"),
-      );
-      return false;
+      await api.delete(`/tasks/${permanentDeleteTargetId}/permanent`);
+      toast.add({ title: t("success.permanentDeleted"), type: "success" });
+      setPermanentDeleteTargetId(null);
+      fetchTasks();
+    } catch (err: any) {
+      toast.add({ title: err.response?.data?.message || t("errors.permanentDelete"), type: "error" });
     }
   };
 
-  const getPageNumbers = () => {
-    if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
+  // Confirm and empty all trash
+  const confirmEmptyTrash = async () => {
+    try {
+      await api.delete("/tasks/trash/empty");
+      toast.add({ title: t("success.trashEmptied"), type: "success" });
+      setIsEmptyTrashConfirmOpen(false);
+      fetchTasks();
+    } catch (err: any) {
+      toast.add({ title: err.response?.data?.message || t("errors.emptyTrash"), type: "error" });
     }
-
-    let startPage = Math.max(2, currentPage - 2);
-    let endPage = Math.min(totalPages - 1, currentPage + 2);
-
-    if (startPage <= 3) {
-      startPage = 2;
-    }
-    if (endPage >= totalPages - 2) {
-      endPage = totalPages - 1;
-    }
-
-    const pages: (number | string)[] = [];
-
-    pages.push(1);
-
-    if (startPage > 2) {
-      pages.push("...");
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-
-    if (endPage < totalPages - 1) {
-      pages.push("...");
-    }
-
-    pages.push(totalPages);
-
-    return pages;
   };
 
-  const selectedTodo = todos.find((todo) => todo.id === selectedTodoId) || null;
-  const selectedProjectName = selectedProjectId
-    ? projects.find((p) => p._id === selectedProjectId)?.name || ""
-    : "";
+  const selectedTask = tasks.find((t) => t._id === selectedTaskId) || null;
 
   return (
-    <main className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
+    <main className="min-h-screen bg-background pt-6 pb-28 px-4 sm:px-6 lg:px-8 transition-colors">
+      <div className="mx-auto max-w-5xl space-y-6">
         {/* Header */}
-        <div className="mb-8 flex items-start justify-between">
+        <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
           <div>
-            <h1 className="page-title mb-2">{t("app.title")}</h1>
-            <p className="text-muted-foreground">{t("app.subtitle")}</p>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
+              <span>{t("app.title")}</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              {t("app.subtitle")}
+            </p>
           </div>
-          <div className="flex items-center gap-1">
+
+          <div className="flex items-center gap-2">
             <ThemeToggle theme={theme} onToggle={toggleTheme} />
             <LanguageSelector />
-          </div>
-        </div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar */}
-          <ProjectSidebar
-            projects={projects}
-            selectedProjectId={selectedProjectId}
-            onSelectProject={(id) => {
-              setSelectedProjectId(id);
-              setCurrentPage(1);
-            }}
-            onAddProject={addProject}
-            onUpdateProject={updateProject}
-            onDeleteProject={deleteProject}
-            loading={projectsLoading}
-          />
-
-          {/* Main Content */}
-          <div className="flex-1 min-w-0">
-            {selectedProjectId && (
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-foreground">
-                  {selectedProjectName}
-                </h2>
-              </div>
-            )}
-
-            {/* Add Todo Form */}
-            <AddTodoForm
-              onAdd={addTodo}
-              projects={projects}
-              selectedProjectId={selectedProjectId}
-            />
-
-            {/* Filters and Search */}
-            <TodoFilters
-              searchQuery={searchQuery}
-              onSearchChange={handleSearchChange}
-              statusFilter={statusFilter}
-              onStatusFilterChange={handleFilterChange}
-              todoCount={totalCount}
-              itemsPerPage={itemsPerPage}
-              onItemsPerPageChange={(limit) => {
-                setItemsPerPage(limit);
-                setCurrentPage(1);
-              }}
-            />
-
-            {/* Todo List */}
-            {loading && todos.length === 0 ? (
-              <div className="mt-12 flex flex-col items-center justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                <p className="mt-4 text-sm text-muted-foreground">
-                  {t("common.loading")}
-                </p>
-              </div>
-            ) : todos.length > 0 ? (
-              <div
-                className={
-                  loading
-                    ? "opacity-50 pointer-events-none transition-opacity"
-                    : "transition-opacity"
-                }
-              >
-                <TodoList
-                  todos={todos}
-                  onToggle={toggleTodo}
-                  onDelete={deleteTodo}
-                  onEdit={setEditingId}
-                  onUpdate={updateTodo}
-                  editingId={editingId}
-                  onViewDetails={setSelectedTodoId}
-                />
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="mt-8 flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      {t("pagination.page")}{" "}
-                      <span className="font-semibold">{currentPage}</span>{" "}
-                      {t("pagination.of")}{" "}
-                      <span className="font-semibold">{totalPages}</span>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() =>
-                          setCurrentPage((prev) => Math.max(1, prev - 1))
-                        }
-                        disabled={currentPage === 1}
-                        className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
-                      >
-                        {t("pagination.prev")}
-                      </button>
-
-                      <div className="flex gap-1">
-                        {getPageNumbers().map((page, idx) => {
-                          if (page === "...") {
-                            return (
-                              <span
-                                key={`ellipsis-${idx}`}
-                                className="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium text-muted-foreground select-none"
-                              >
-                                ...
-                              </span>
-                            );
-                          }
-
-                          return (
-                            <button
-                              key={`page-${page}`}
-                              onClick={() => setCurrentPage(page as number)}
-                              className={`inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                                currentPage === page
-                                  ? "bg-primary text-primary-foreground"
-                                  : "border border-input bg-background hover:bg-muted"
-                              }`}
-                            >
-                              {page}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <button
-                        onClick={() =>
-                          setCurrentPage((prev) =>
-                            Math.min(totalPages, prev + 1),
-                          )
-                        }
-                        disabled={currentPage === totalPages}
-                        className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
-                      >
-                        {t("pagination.next")}
-                      </button>
-                    </div>
-                  </div>
-                )}
+            {user ? (
+              <div className="flex items-center gap-2 pl-2 border-l border-border">
+                <div className="hidden sm:block text-right">
+                  <div className="text-xs font-bold text-foreground">{user.fullName}</div>
+                  <div className="text-[10px] text-muted-foreground">{user.email}</div>
+                </div>
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                  title={t("app.logout")}
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t("app.logout")}</span>
+                </button>
               </div>
             ) : (
-              <div className="mt-12 rounded-lg border border-dashed border-border bg-muted/50 py-12 text-center">
-                <p className="text-muted-foreground">
-                  {searchQuery || statusFilter !== "all"
-                    ? t("empty.noTasksFiltered")
-                    : t("empty.noTasks")}
-                </p>
+              <div className="flex items-center gap-2 pl-2 border-l border-border">
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-sm"
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span>{t("app.loginRegister")}</span>
+                </button>
+                <button
+                  onClick={demoLogin}
+                  className="hidden sm:flex items-center gap-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-2.5 py-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>{t("app.demo")}</span>
+                </button>
               </div>
             )}
           </div>
-        </div>
+        </header>
+
+        {/* Demo Account Warning Banner */}
+        {user?.isDemo && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-start gap-3 shadow-sm">
+            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">{t("app.demoWarning")}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("app.demoWarningSignUp")}</p>
+            </div>
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex-shrink-0 flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shadow-sm"
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              <span>{t("app.loginRegister")}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Not Logged In Banner */}
+        {!user && (
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center shadow-sm">
+            <h2 className="text-lg font-bold text-foreground">{t("app.welcomeTitle")}</h2>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+              {t("app.welcomeDesc")}
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-sm"
+              >
+                <LogIn className="h-4 w-4" />
+                <span>{t("app.loginRegister")}</span>
+              </button>
+              <button
+                onClick={demoLogin}
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted cursor-pointer"
+              >
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span>{t("app.tryDemo")}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Daily Activity Heatmap Component */}
+        {user && (
+          <DailyActivityHeatmap
+            activities={activities}
+            stats={stats}
+            loading={loadingActivities}
+            onDateClick={handleDateChange}
+            onRefresh={() => {
+              fetchActivities();
+              fetchTasks();
+            }}
+            selectedDate={selectedDate}
+            selectedYear={selectedYear}
+            onYearChange={setSelectedYear}
+          />
+        )}
+
+        {/* Daily Todo Section */}
+        <section className="space-y-4">
+          {/* Date Navigation (Hidden in Trash mode) */}
+          {statusFilter !== "trash" && (
+            <DatePickerNav
+              selectedDate={selectedDate}
+              onDateChange={handleDateChange}
+              timezone={userTimezone}
+            />
+          )}
+
+          {/* Add Todo Form (Hidden when viewing Past Dates or in Trash mode) */}
+          {statusFilter !== "trash" && !isPastDate && (
+            <AddTodoForm
+              onAdd={handleAddTask}
+              selectedDate={selectedDate}
+              timezone={userTimezone}
+            />
+          )}
+
+          {/* Filters */}
+          <TodoFilters
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            priorityFilter={priorityFilter}
+            onPriorityFilterChange={setPriorityFilter}
+            todoCount={tasks.length}
+            onEmptyTrash={() => setIsEmptyTrashConfirmOpen(true)}
+          />
+
+          {/* Task List with TaskSkeleton during loading */}
+          {loadingTasks && tasks.length === 0 ? (
+            <TaskSkeleton />
+          ) : (
+            <TodoList
+              todos={tasks}
+              onToggle={handleToggleTask}
+              onDelete={handleDeleteTask}
+              onRestore={handleRestoreTask}
+              onPermanentDelete={(id) => setPermanentDeleteTargetId(id)}
+              onEdit={setEditingId}
+              onUpdate={handleUpdateTask}
+              editingId={editingId}
+              onViewDetails={setSelectedTaskId}
+              isTrashView={statusFilter === "trash"}
+            />
+          )}
+        </section>
       </div>
 
       {/* Task Details Modal */}
       <TaskDetailsModal
-        todo={selectedTodo}
-        projects={projects}
-        onClose={() => setSelectedTodoId(null)}
-        onToggle={toggleTodo}
-        onDelete={deleteTodo}
+        todo={selectedTask}
+        onClose={() => setSelectedTaskId(null)}
+        onToggle={handleToggleTask}
+        onDelete={handleDeleteTask}
+        onRestore={handleRestoreTask}
+        onPermanentDelete={(id) => {
+          setSelectedTaskId(null);
+          setPermanentDeleteTargetId(id);
+        }}
         onEdit={(id) => {
           setEditingId(id);
-          setSelectedTodoId(null);
+          setSelectedTaskId(null);
         }}
+      />
+
+      {/* Auth Modal */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+
+      {/* Shadcn AlertDialog for Permanent Delete Single Task */}
+      <ConfirmDialog
+        open={Boolean(permanentDeleteTargetId)}
+        onOpenChange={(open) => !open && setPermanentDeleteTargetId(null)}
+        title={t("todo.permanentDeleteTitle")}
+        description={t("todo.permanentDeleteConfirm")}
+        confirmText={t("todo.permanentDelete")}
+        cancelText={t("common.cancel")}
+        onConfirm={confirmPermanentDelete}
+        variant="destructive"
+      />
+
+      {/* Shadcn AlertDialog for Empty Trash */}
+      <ConfirmDialog
+        open={isEmptyTrashConfirmOpen}
+        onOpenChange={setIsEmptyTrashConfirmOpen}
+        title={t("todo.emptyTrashTitle")}
+        description={t("todo.emptyTrashConfirm")}
+        confirmText={t("todo.emptyTrash")}
+        cancelText={t("common.cancel")}
+        onConfirm={confirmEmptyTrash}
+        variant="destructive"
       />
     </main>
   );

@@ -10,4 +10,19 @@ const api = axios.create({
   withCredentials: true,
 });
 
+function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  const demoToken = sessionStorage.getItem("demo_token");
+  if (demoToken) return demoToken;
+  return localStorage.getItem("token");
+}
+
+api.interceptors.request.use((config) => {
+  const token = getAuthToken();
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export default api;
