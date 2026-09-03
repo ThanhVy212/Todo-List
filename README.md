@@ -100,5 +100,3 @@ npm run dev
 
 - Backend: `http://localhost:{PORT}`
 - Frontend: `http://localhost:5173`
-
-## 📁 Project Structure
